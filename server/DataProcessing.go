@@ -12,6 +12,7 @@ import (
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 )
 
+// Struct Client đại diện cho một client kết nối
 type Client struct {
 	conn     net.Conn
 	nickname string
@@ -19,9 +20,8 @@ type Client struct {
 
 var clients map[net.Addr]Client
 
+// Hàm handleConnection xử lý kết nối từ client
 func handleConnection(conn net.Conn) {
-	//fmt.Println("Client connected:", conn.RemoteAddr())
-
 	client := Client{
 		conn:     conn,
 		nickname: conn.RemoteAddr().String(),
@@ -35,7 +35,6 @@ func handleConnection(conn net.Conn) {
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
-			//fmt.Println("Client disconnected:", conn.RemoteAddr())
 			delete(clients, conn.RemoteAddr())
 			return
 		}
@@ -43,7 +42,7 @@ func handleConnection(conn net.Conn) {
 		message := string(buf[:n])
 		message = strings.TrimSpace(message)
 
-		// msg from client
+		// Tin nhắn từ client
 		fmt.Printf("%s: %s\n", "Myboss: ", message)
 
 		if client.nickname == conn.RemoteAddr().String() {
@@ -57,6 +56,7 @@ func handleConnection(conn net.Conn) {
 	}
 }
 
+// Hàm broadcastMessage gửi tin nhắn đến tất cả client trừ người gửi
 func broadcastMessage(sender Client, message string) {
 	for _, client := range clients {
 		if client.conn != sender.conn {
@@ -65,15 +65,18 @@ func broadcastMessage(sender Client, message string) {
 	}
 }
 
+// Hàm connectToDatabase tạo và trả về một kết nối đến cơ sở dữ liệu InfluxDB
 func connectToDatabase(url, token, org, bucket string) influxdb2.Client {
 	client := influxdb2.NewClient(url, token)
 	return client
 }
 
+// Hàm checkHighUsage kiểm tra xem mức sử dụng RAM và CPU có vượt quá ngưỡng cao không
 func checkHighUsage(ram float64, cpu float64) bool {
 	return ram > 90.0 || cpu > 90.0
 }
 
+// Hàm processData truy vấn dữ liệu từ cơ sở dữ liệu InfluxDB và xử lý nó
 func processData(client influxdb2.Client, org, bucket string, conn net.Conn) {
 	queryAPI := client.QueryAPI(org)
 
@@ -92,7 +95,7 @@ func processData(client influxdb2.Client, org, bucket string, conn net.Conn) {
 		record := results.Record()
 		timeValue, timeExists := record.Values()["_time"].(time.Time)
 		if !timeExists {
-			fmt.Println("Invalid data format, skipping this record")
+			fmt.Println("Dịnh dạng dữ liệu không hợp lệ, bỏ qua bản ghi này")
 			continue
 		}
 
@@ -102,11 +105,11 @@ func processData(client influxdb2.Client, org, bucket string, conn net.Conn) {
 		cpu, cpuExists := record.Values()["CPU"].(float64)
 
 		if !deviceExists || !statusExists || !ramExists || !cpuExists {
-			fmt.Println("Invalid data format, skipping this record")
+			fmt.Println("Dịnh dạng dữ liệu không hợp lệ, bỏ qua bản ghi này")
 			continue
 		}
 
-		//fmt.Printf("Time: %s, Device: %s, Status: %s, RAM: %.2f, CPU: %.2f\n", timeValue, device, status, ram, cpu)
+		fmt.Printf("Thời gian: %s, Thiết bị: %s, Trạng thái: %s, RAM: %.2f, CPU: %.2f\n", timeValue, device, status, ram, cpu)
 
 		if status == "Error" && checkHighUsage(ram, cpu) {
 			go handleConnection(conn)
@@ -127,7 +130,7 @@ func main() {
 
 	listener, err := net.Listen("tcp", "127.0.0.1:8080")
 	if err != nil {
-		fmt.Println("Error:", err)
+		fmt.Println("Lỗi:", err)
 		os.Exit(1)
 	}
 	defer listener.Close()
@@ -137,11 +140,9 @@ func main() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Println("Error:", err)
+			fmt.Println("Lỗi:", err)
 			continue
 		}
 		processData(client, org, bucket, conn)
-
 	}
-
 }

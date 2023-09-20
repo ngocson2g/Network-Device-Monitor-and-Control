@@ -12,14 +12,17 @@ import (
 )
 
 var (
+	// Danh sách thiết bị và trạng thái giả định
 	devices = []string{"deviceA", "DeviceB", "DeviceC", "DeviceD"}
 	status  = []string{"running", "Stop", "Error"}
 )
 
+// Hàm randomChoice chọn ngẫu nhiên một phần tử từ danh sách
 func randomChoice(choices []string) string {
 	return choices[rand.Intn(len(choices))]
 }
 
+// Hàm createData tạo dữ liệu ngẫu nhiên cho thiết bị và trạng thái
 func createData() map[string]interface{} {
 	rand.Seed(time.Now().UnixNano())
 
@@ -38,12 +41,14 @@ func createData() map[string]interface{} {
 	return data
 }
 
+// Hàm connectToDatabase tạo và trả về một kết nối đến cơ sở dữ liệu InfluxDB
 func connectToDatabase(url, token, org, bucket string) influxdb2.Client {
 	client := influxdb2.NewClient(url, token)
 	return client
 }
 
-func sendData(client influxdb2.Client, org, bucket string, data map[string]interface{}, countTime int) error {
+// Hàm sendData gửi dữ liệu đến cơ sở dữ liệu InfluxDB
+func sendData(client influxdb2.Client, org, bucket string, data map[string]interface{}) error {
 	device := data["Device"].(string)
 	status := data["status"].(string)
 	ram := data["RAM"].(float64)
@@ -56,14 +61,14 @@ func sendData(client influxdb2.Client, org, bucket string, data map[string]inter
 		"status": status,
 	}
 	fields := map[string]interface{}{
-		"RAM": ram, // Use "_value" for RAM field
-		"CPU": cpu, // Use "CPU" for CPU field
+		"RAM": ram,
+		"CPU": cpu,
 	}
 	point := write.NewPoint(
 		"device_status", // Measurement
 		tags,            // Tags
 		fields,          // Fields
-		time.Now().Add(time.Duration(countTime*10)*time.Second), // Time
+		time.Now(),      // Thời gian
 	)
 
 	if err := writeAPI.WritePoint(context.Background(), point); err != nil {
@@ -73,6 +78,7 @@ func sendData(client influxdb2.Client, org, bucket string, data map[string]inter
 	return nil
 }
 
+// Hàm updateDB cập nhật cơ sở dữ liệu InfluxDB với dữ liệu giả định
 func updateDB() {
 	token := os.Getenv("INFLUXDB_TOKEN")
 	url := "http://localhost:8086"
@@ -80,14 +86,14 @@ func updateDB() {
 	bucket := "testappfinal"
 	client := connectToDatabase(url, token, org, bucket)
 
-	for value := 0; value < 10; value++ {
+	for value := 1; value < 1000; value++ {
 		data := createData()
 		fmt.Println(data)
-		if err := sendData(client, org, bucket, data, value); err != nil {
+		if err := sendData(client, org, bucket, data); err != nil {
 			fmt.Println(err)
 		}
 	}
-	fmt.Println("update data complete")
+	fmt.Println("Cập nhật dữ liệu hoàn tất")
 }
 
 func main() {
